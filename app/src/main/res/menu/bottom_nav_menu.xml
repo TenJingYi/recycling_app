@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/home"
+        android:title="@string/nav_home"
+        android:icon="@drawable/ic_baseline_home"/>
+
+    <item
+        android:id="@+id/scan"
+        android:title="@string/nav_scan"
+        android:icon="@drawable/ic_baseline_scan"/>
+
+    <item
+        android:id="@+id/map"
+        android:title="@string/nav_map"
+        android:icon="@drawable/ic_baseline_map"/>
+
+    <item
+        android:id="@+id/achievement"
+        android:title="@string/nav_achievement"
+        android:icon="@drawable/ic_baseline_achievement"/>
+
+    <item
+        android:id="@+id/profile"
+        android:title="@string/nav_profile"
+        android:icon="@drawable/ic_baseline_profile"/>
+</menu>
