@@ -60,8 +60,13 @@ dependencies {
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
 
-    // Generative AI SDK for Gemini
-    implementation("com.google.android.generativeai:generativeai:0.7.0")
+    // Check for this specific line:
+    implementation("com.google.ai.client.generativeai:generativeai:0.7.0")
 
-    implementation("com.google.mlkit:object-detection:17.0.1")
+    // Also recommended for Java users:
+    implementation("com.google.guava:guava:31.1-android")
+
+    implementation("androidx.camera:camera-view:1.3.0")
+    implementation("androidx.camera:camera-lifecycle:1.3.0")
+    implementation("androidx.camera:camera-camera2:1.3.0")
 }
