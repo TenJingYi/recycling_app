@@ -25,12 +25,19 @@ import com.google.ai.client.generativeai.type.GenerateContentResponse;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 public class ScanFragment extends Fragment {
 
     private FragmentScanBinding binding;
+    // Note: In a production app, keep your API keys in a local.properties file for security!
     private final String API_KEY = "AIzaSyA56B1kUIVpsagJr1tXCGYyK8icMN87LQ4";
 
     @Override
@@ -43,65 +50,47 @@ public class ScanFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // --- NEW: Start Camera Preview ---
         if (allPermissionsGranted()) {
             startCamera();
         } else {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, 10);
         }
 
-        // --- MODIFIED: Scan Button Logic ---
         binding.sendPromptButton.setOnClickListener(v -> {
-            // Grab the current frame from the live camera preview
+            String userText = binding.QueryEditText.getText().toString().trim();
             Bitmap bitmap = binding.previewView.getBitmap();
 
-            if (bitmap != null) {
-                // Pass the image to Gemini
-                callGeminiAI(bitmap);
+            if (!userText.isEmpty()) {
+                // CHOICE 1: User typed something.
+                // We pass 'null' for the bitmap so the AI only analyzes the text.
+                callGeminiAI(null, userText);
+
+                // Clear the text field after sending for better UX
+                binding.QueryEditText.setText("");
+                binding.QueryEditText.clearFocus();
+            } else if (bitmap != null) {
+                // CHOICE 2: Text is empty, so we use the Camera Image.
+                callGeminiAI(bitmap, "Act as a recycling expert. What is this item and which bin does it go in?");
             } else {
-                Toast.makeText(getContext(), "Camera not ready", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Please type an item or point camera at one", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    // --- NEW: CameraX Implementation ---
-    private void startCamera() {
-        ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext());
-
-        cameraProviderFuture.addListener(() -> {
-            try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-                Preview preview = new Preview.Builder().build();
-                preview.setSurfaceProvider(binding.previewView.getSurfaceProvider());
-
-                CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
-
-                cameraProvider.unbindAll();
-                cameraProvider.bindToLifecycle(this, cameraSelector, preview);
-            } catch (ExecutionException | InterruptedException e) {
-                e.printStackTrace();
-            }
-        }, ContextCompat.getMainExecutor(requireContext()));
-    }
-
-    private boolean allPermissionsGranted() {
-        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    // --- MODIFIED: Now accepts a Bitmap instead of a String ---
-    private void callGeminiAI(Bitmap bitmap) {
+    private void callGeminiAI(Bitmap bitmap, String prompt) {
         binding.sendPromptProgressBar.setVisibility(View.VISIBLE);
-        binding.responseTextView.setText("Analyzing image...");
+        binding.responseTextView.setText("Analyzing...");
 
         GenerativeModel gm = new GenerativeModel("gemini-2.5-flash", API_KEY);
         GenerativeModelFutures model = GenerativeModelFutures.from(gm);
 
-        // Create multimodal content (Image + Text)
-        Content content = new Content.Builder()
-                .addImage(bitmap)
-                .addText("Act as a recycling expert. What is this item and which bin does it go in?")
-                .build();
+        Content.Builder contentBuilder = new Content.Builder();
+        if (bitmap != null) {
+            contentBuilder.addImage(bitmap);
+        }
+        contentBuilder.addText(prompt);
 
+        Content content = contentBuilder.build();
         ListenableFuture<GenerateContentResponse> response = model.generateContent(content);
 
         Futures.addCallback(response, new FutureCallback<GenerateContentResponse>() {
@@ -111,6 +100,9 @@ public class ScanFragment extends Fragment {
                     getActivity().runOnUiThread(() -> {
                         binding.sendPromptProgressBar.setVisibility(View.GONE);
                         binding.responseTextView.setText(result.getText());
+
+                        // AWARD XP ON SUCCESSFUL AI RESPONSE
+                        updateXP(10);
                     });
                 }
             }
@@ -125,6 +117,46 @@ public class ScanFragment extends Fragment {
                 }
             }
         }, ContextCompat.getMainExecutor(requireContext()));
+    }
+
+    private void updateXP(int pointsToAdd) {
+        if (FirebaseAuth.getInstance().getCurrentUser() == null) return;
+
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(userId);
+
+        userRef.update("xp", FieldValue.increment(pointsToAdd))
+                .addOnSuccessListener(aVoid -> {
+                    if (isAdded()) {
+                        Toast.makeText(getContext(), "Recycling point added! +" + pointsToAdd + " XP", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    // Create document if it doesn't exist
+                    Map<String, Object> user = new HashMap<>();
+                    user.put("xp", pointsToAdd);
+                    userRef.set(user);
+                });
+    }
+
+    private void startCamera() {
+        ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext());
+        cameraProviderFuture.addListener(() -> {
+            try {
+                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                Preview preview = new Preview.Builder().build();
+                preview.setSurfaceProvider(binding.previewView.getSurfaceProvider());
+                CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
+                cameraProvider.unbindAll();
+                cameraProvider.bindToLifecycle(this, cameraSelector, preview);
+            } catch (ExecutionException | InterruptedException e) {
+                e.printStackTrace();
+            }
+        }, ContextCompat.getMainExecutor(requireContext()));
+    }
+
+    private boolean allPermissionsGranted() {
+        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
     }
 
     @Override

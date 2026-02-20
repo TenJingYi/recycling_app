@@ -1,64 +1,78 @@
 package com.example.recyclingapp;
 
 import android.os.Bundle;
-
-import androidx.fragment.app.Fragment;
-
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
 
-/**
- * A simple {@link Fragment} subclass.
- * Use the {@link AchievementFragment#newInstance} factory method to
- * create an instance of this fragment.
- */
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+
 public class AchievementFragment extends Fragment {
 
-    // TODO: Rename parameter arguments, choose names that match
-    // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-    private static final String ARG_PARAM1 = "param1";
-    private static final String ARG_PARAM2 = "param2";
+    private ProgressBar pbLevel;
+    private TextView tvLevel, tvXpDetails;
 
-    // TODO: Rename and change types of parameters
-    private String mParam1;
-    private String mParam2;
-
-    public AchievementFragment() {
-        // Required empty public constructor
-    }
-
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment AchievementFragment.
-     */
-    // TODO: Rename and change types and number of parameters
-    public static AchievementFragment newInstance(String param1, String param2) {
-        AchievementFragment fragment = new AchievementFragment();
-        Bundle args = new Bundle();
-        args.putString(ARG_PARAM1, param1);
-        args.putString(ARG_PARAM2, param2);
-        fragment.setArguments(args);
-        return fragment;
-    }
+    public AchievementFragment() { super(R.layout.fragment_achievement); }
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
-            mParam2 = getArguments().getString(ARG_PARAM2);
-        }
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        pbLevel = view.findViewById(R.id.pbLevel);
+        tvLevel = view.findViewById(R.id.tvCurrentLevel);
+        tvXpDetails = view.findViewById(R.id.tvXpDetails); // Add this ID to your XML
+
+        // Inside AchievementFragment.java onViewCreated
+        Button btnOption1 = view.findViewById(R.id.btnOption1);
+        Button btnOption2 = view.findViewById(R.id.btnOption2);
+
+        btnOption1.setOnClickListener(v -> {
+            Toast.makeText(getContext(), "Wrong! Grease ruins paper recycling.", Toast.LENGTH_SHORT).show();
+        });
+
+        btnOption2.setOnClickListener(v -> {
+            Toast.makeText(getContext(), "Correct! +20 XP", Toast.LENGTH_SHORT).show();
+            updateUI(20); // Reuse your updateXP method from before
+            v.setEnabled(false); // Prevent multiple clicks
+            btnOption1.setEnabled(false);
+        });
+
+        loadUserProgress();
     }
 
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_achievement, container, false);
+    private void loadUserProgress() {
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(userId);
+
+        // Real-time listener: Updates UI automatically when DB changes!
+        userRef.addSnapshotListener((snapshot, e) -> {
+            if (snapshot != null && snapshot.exists()) {
+                Long xpLong = snapshot.getLong("xp");
+                int currentXp = (xpLong != null) ? xpLong.intValue() : 0;
+
+                updateUI(currentXp);
+            }
+        });
     }
+
+    private void updateUI(int xp) {
+        // Simple Engineering Logic: 100 XP per level
+        int level = (xp / 100) + 1;
+        int progressInsideLevel = xp % 100;
+
+        tvLevel.setText("Level " + level + ": Eco-Warrior");
+        pbLevel.setProgress(progressInsideLevel);
+        tvXpDetails.setText(progressInsideLevel + " / 100 XP to next level");
+
+        // Logic for unlocking badges could go here!
+    }
+
+
 }

@@ -80,4 +80,6 @@ dependencies {
     implementation("com.google.android.libraries.places:places:3.2.0")
 
     implementation("com.google.firebase:firebase-auth:23.1.0")
+
+    implementation("com.google.firebase:firebase-firestore:25.1.1")
 }
